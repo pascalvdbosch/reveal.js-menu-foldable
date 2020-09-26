@@ -593,6 +593,14 @@ const Plugin = () => {
           item.classList.add('past');
         } else if (h === state.indexh && v === state.indexv) {
           item.classList.add('active');
+          let p = item.parentNode;
+          while (p != null) {
+            if (p.nodeName == "UL" && p.classList.contains("nested")) {
+              p.previousSibling.classList.add("unfolded");
+              p.previousSibling.classList.remove("folded");
+            }
+            p = p.parentNode;
+          }
         } else {
           item.classList.add('future');
         }
@@ -750,23 +758,29 @@ const Plugin = () => {
         }
 
         var item = create('li', {
-          class: type,
+          class: type + " nothing",
           'data-item': i,
           'data-slide-h': h,
           'data-slide-v': v === undefined ? 0 : v
         });
 
         if (options.markers) {
+          let adding = create('i', { class: 'fas fa-plus-circle fa-fw past' }); // past = closed
+          adding.addEventListener("click", (n) => {
+            adding.parentElement.classList.remove("folded");
+            adding.parentElement.classList.add("unfolded");
+            n.stopPropagation();
+          });
+          item.appendChild(adding);
+          adding = create('i', { class: 'fas fa-minus-circle fa-fw active' }); // active = open
+          adding.addEventListener("click", (n) => {
+            adding.parentElement.classList.remove("unfolded");
+            adding.parentElement.classList.add("folded");
+            n.stopPropagation();
+          });
+          item.appendChild(adding);
           item.appendChild(
-            create('i', { class: 'fas fa-check-circle fa-fw past' })
-          );
-          item.appendChild(
-            create('i', {
-              class: 'fas fa-arrow-alt-circle-right fa-fw active'
-            })
-          );
-          item.appendChild(
-            create('i', { class: 'far fa-circle fa-fw future' })
+            create('i', { class: 'far fa-circle fa-fw future' }) // future = no children
           );
         }
 
@@ -814,7 +828,6 @@ const Plugin = () => {
 
         return item;
       }
-
       function createSlideMenu() {
         if (
           !document.querySelector(
@@ -830,6 +843,8 @@ const Plugin = () => {
           var items = select(
             '.slide-menu-panel[data-panel="Slides"] > .slide-menu-items'
           );
+          var thastack = [items];
+          var prevv = 0; 
           var slideCount = 0;
           selectAll('.slides > section').forEach(function (section, h) {
             var subsections = selectAll('section', section);
@@ -844,18 +859,45 @@ const Plugin = () => {
                 slideCount++;
               });
             } else {
+              let depth = 0;
+              if (select("h1", section) != null) depth = 1;
+              if (select("h2", section) != null) depth = 2;
+              if (select("h3", section) != null) depth = 3;
+              if (select("h4", section) != null) depth = 4;
+              if (depth == 0) return;
+              while (depth > thastack.length) {
+                let n = create('ul', {
+                  class: "nested",
+                  style: "padding-left: 20px;"
+                });
+                if (prevv != null) {
+                  prevv.classList.remove("nothing");
+                  prevv.classList.add("folded");
+                  prevv = null;
+                }
+                thastack.push(n);
+              }
+              while (depth < thastack.length) {
+                thastack[thastack.length-2].appendChild(thastack[thastack.length-1]);
+                thastack.pop();
+              }
               var item = generateItem(
                 'slide-menu-item',
                 section,
                 slideCount,
                 h
               );
+              prevv = item;
               if (item) {
-                items.appendChild(item);
+                thastack[thastack.length - 1].appendChild(item);
               }
               slideCount++;
             }
           });
+          while (thastack.length > 1) {
+            thastack[thastack.length-2].appendChild(thastack[thastack.length-1]);
+            thastack.pop();
+          }
           selectAll('.slide-menu-item, .slide-menu-item-vertical').forEach(
             function (i) {
               i.onclick = clicked;
